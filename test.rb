@@ -14,7 +14,7 @@ class MiniP < Parslet::Parser
   #rule(:stringend)  { match["[^']"].repeat >> nonword}
   rule(:integer)    { match('[0-9]').repeat(1).as(:int) }
   rule(:operator)   { str("eq").as(:op) >> space? }
-  rule(:logicalop)  { (str("and") | str("or")).as(:logical) >> space? }
+  rule(:logicalop)  { (str("and") | str("or")).as(:bool) >> space? }
   rule(:identifier) { match('\w').repeat.as(:id) >> space? }
   rule(:string) {
     quote >> (
@@ -24,9 +24,11 @@ class MiniP < Parslet::Parser
   
   # Grammar parts
   rule(:literal)  { (string | integer).as(:lit) }
+  #rule(:expr) { identifier }
   rule(:expr)     { (identifier >> operator >> literal) >> space? }
   rule(:term)     { (lparen >> clause >> rparen) | expr }
-  rule(:clause)   { (term >> (logicalop >> term.as(:rhs)).repeat.maybe).as(:c) }
+  #rule(:clause)   { (term.as(:lhs) >> logicalop >> term.as(:rhs)) | term }
+  rule(:clause) { infix_expression( term , [logicalop, 1, :left] )}
   root(:clause)
 end
 
@@ -41,19 +43,21 @@ FunCall = Struct.new(:name, :args) do
 end
 Comparison = Struct.new(:id,:op,:lit) do
 end
-BooleanOp = Struct.new(:op,:rhs) do
+BooleanOp = Struct.new(:lhs,:op,:rhs) do
 end
 
 class MiniT < Parslet::Transform
   rule(:string => simple(:string) ) { String.new(string)}
   rule(:int => simple(:int) ) { Integer(int)}
+  rule(:bool => simple(:string) ) { String.new(string)}
 
   rule( :id => simple(:id),
         :op => simple(:op),
         :lit => simple(:lit) )      {Comparison.new(id,op,lit)}
   
-  rule( :logical => simple(:op),
-         :rhs => simple(:rhs))  { BooleanOp.new(op,rhs)}
+  rule( :l => simple(:lhs),
+        :o => simple(:op),
+        :r => simple(:rhs))  { BooleanOp.new(lhs,op,rhs)}
 
 end
 
@@ -90,11 +94,12 @@ q = "(InvoiceID eq '67520098-b424-4108-98ca-9aa431e4654a/V0005'
   "(a or b ) and ((c or d) and e)"]
 
 
-  r = "InvoiceID eq '67520098-b424-4108-98ca-9aa431e4654a/V0005' or X eq 4"
+  r = "InvoiceID eq '67520098-b424-4108-98ca-9aa431e4654a/V0005' "
+pp parse(r)
 pp parse(q)
 
-# s.each do |w|
-#   pp parse(w)
-# end
+#  s.each do |w|
+#    pp parse(w)
+#  end
 
 
